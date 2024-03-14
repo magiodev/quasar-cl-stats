@@ -1,0 +1,19 @@
+[deployment]
+[[deployment.rule]]
+shard = "primary"
+indexers = [ "index_node_cosmos_1" ]
+
+[store]
+[store.primary]
+connection = "postgresql://graph-node:let-me-in@postgres:5432/graph-node?sslmode=prefer"
+pool_size = 10
+
+[chains]
+ingestor = "block_ingestor_node"
+
+[chains.osmosis]
+shard = "primary"
+protocol = "cosmos"
+provider = [
+    { label = "osmosis", details = { type = "firehose", url = "http://host.docker.internal:9030" }},
+]

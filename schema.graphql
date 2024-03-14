@@ -1,0 +1,40 @@
+type Block @entity {
+    id: ID!
+    height: BigInt!
+    timestamp: BigInt!
+}
+
+type VaultDeposit @entity {
+    id: ID!
+    block: Block! # the latest deposit indexed block height
+    vault: String!
+    tokensIn: [Coin!]! # User effective deposited coins, denoms here are amount0 and amount1
+    tokensOut: [Coin!]! # User effective refunded coins, denoms here are refund0 and refund1
+    interactionsCount: BigInt
+    totalUsers: BigInt
+    activeUsers: BigInt
+}
+
+type VaultRedeem @entity {
+    id: ID!
+    block: Block! # the latest redeem indexed block height
+    vault: String!
+    tokensOut: [Coin!]! # vault total effective withdrawn coins
+    interactionsCount: BigInt
+    totalUsers: BigInt
+    activeUsers: BigInt}
+
+type VaultClaimReward @entity {
+    id: ID!
+    block: Block! # the latest claim rewards indexed block height
+    vault: String!
+    tokensOut: [Coin!]! # vault total claimed reward coins per vault
+    interactionsCount: BigInt
+    totalUsers: BigInt
+}
+
+type Coin @entity {
+    id: ID!
+    denom: String!
+    amount: String!
+}
