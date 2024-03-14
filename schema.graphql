@@ -1,40 +1,61 @@
 type Block @entity {
-    id: ID!
-    height: BigInt!
-    timestamp: BigInt!
+    id: ID!  # Unique identifier for the block, typically the block hash
+    height: BigInt!  # The height of the block in the blockchain
+    timestamp: BigInt!  # The timestamp when the block was mined
+}
+
+type VaultUser @entity {
+    id: ID!  # Composite key: {userId}-{vaultId}, uniquely identifying a user's interaction with a specific vault
+    block: Block!  # The latest block where the user had an interaction with the vault
+    vault: String!  # The ID of the vault
+    tokensIn: [Coin!]!  # The array of coins the user has deposited into the vault
+    tokensOut: [Coin!]!  # The array of coins the user has redeemed from the vault
+    deposits: BigInt  # The total number of deposit interactions the user has made with the vault
+    redeems: BigInt  # The total number of redeem interactions the user has made with the vault
+    claims: BigInt  # The total number of claim reward interactions the user has made with the vault
+    sharesBalance: BigInt  # The current balance of the user's shares in the vault
+}
+
+type VaultUserHistory @entity {
+    id: ID!  # Composite key: {userId}-{vaultId}-{blockHeight}, uniquely identifying an historical record for a user's interaction with a vault
+    user: VaultUser!  # The associated VaultUser entity
+    block: Block!  # The block where the historical interaction took place
+    vault: String!  # The ID of the vault
+    tokensIn: [Coin!]!  # Historical record of coins the user had deposited up to this point
+    tokensOut: [Coin!]!  # Historical record of coins the user had redeemed up to this point
+    deposits: BigInt  # Historical total of deposit interactions up to this point
+    redeems: BigInt  # Historical total of redeem interactions up to this point
+    claims: BigInt  # Historical total of claim reward interactions up to this point
+    sharesBalance: BigInt  # Historical shares balance in the vault up to this point
 }
 
 type VaultDeposit @entity {
-    id: ID!
-    block: Block! # the latest deposit indexed block height
-    vault: String!
-    tokensIn: [Coin!]! # User effective deposited coins, denoms here are amount0 and amount1
-    tokensOut: [Coin!]! # User effective refunded coins, denoms here are refund0 and refund1
-    interactionsCount: BigInt
-    totalUsers: BigInt
-    activeUsers: BigInt
+    id: ID!  # Unique identifier for the deposit event {transactionHash}-{logIndex}
+    block: Block!  # The block in which the deposit occurred
+    vault: String!  # The ID of the vault where the deposit was made
+    tokensIn: [Coin!]!  # The coins that were deposited
+    tokensOut: [Coin!]!  # The coins that were refunded
+    count: BigInt  # The number of times deposits have been made into the vault (can aggregate multiple deposits in one transaction)
 }
 
 type VaultRedeem @entity {
-    id: ID!
-    block: Block! # the latest redeem indexed block height
-    vault: String!
-    tokensOut: [Coin!]! # vault total effective withdrawn coins
-    interactionsCount: BigInt
-    totalUsers: BigInt
-    activeUsers: BigInt}
+    id: ID!  # Unique identifier for the redeem event {transactionHash}-{logIndex}
+    block: Block!  # The block in which the redeem occurred
+    vault: String!  # The ID of the vault from which the redeem was made
+    tokensOut: [Coin!]!  # The coins that were redeemed
+    count: BigInt  # The number of times redeems have been made from the vault (can aggregate multiple redeems in one transaction)
+}
 
 type VaultClaimReward @entity {
-    id: ID!
-    block: Block! # the latest claim rewards indexed block height
-    vault: String!
-    tokensOut: [Coin!]! # vault total claimed reward coins per vault
-    interactionsCount: BigInt
-    totalUsers: BigInt
+    id: ID!  # Unique identifier for the claim reward event {transactionHash}-{logIndex}
+    block: Block!  # The block in which the claim reward occurred
+    vault: String!  # The ID of the vault from which the claim was made
+    tokensOut: [Coin!]!  # The reward coins that were claimed
+    count: BigInt  # The number of claim reward interactions that have occurred in the vault
 }
 
 type Coin @entity {
-    id: ID!
-    denom: String!
-    amount: String!
+    id: ID!  # Unique identifier for the coin
+    denom: String!  # The denomination or symbol of the coin
+    amount: String!  # The amount of the coin, represented as a string to accommodate large values
 }
