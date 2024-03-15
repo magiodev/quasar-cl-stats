@@ -1,15 +1,15 @@
 import {BigInt, cosmos} from "@graphprotocol/graph-ts";
-import { saveCoinFromAttribute, updateTotalTokens } from "../helpers";
+import {saveCoinFromAttribute, updateTotalTokens} from "../helpers";
 import {
   VaultClaimReward,
   VaultClaimRewardHistory,
   VaultDeposit, VaultDepositHistory,
   VaultRedeem, VaultRedeemHistory,
-  VaultUser,
-  VaultUserHistory
+  User,
+  UserHistory
 } from "../../../generated/schema";
 
-export function handleVaultDeposit(id: string, block: cosmos.HeaderOnlyBlock, vault: string, tokensIn: string[], tokensOut: string[]): void {
+export function handleVaultDeposit(id: string, block: cosmos.HeaderOnlyBlock, sender: string, vault: string, tokensIn: string[], tokensOut: string[], sharesMinted: string): void {
   let deposit = VaultDeposit.load(id);
 
   if (!deposit) {
@@ -35,33 +35,35 @@ export function handleVaultDeposit(id: string, block: cosmos.HeaderOnlyBlock, va
   depositHistory.count = deposit.count;
   depositHistory.save();
 
-  // Update VaultUser
-  const userId = `${user}-${vault}`;
-  let vaultUser = VaultUser.load(userId) || new VaultUser(userId);
-  vaultUser.block = block.header.hash.toHexString();
-  vaultUser.vault = vault;
-  vaultUser.deposits = vaultUser.deposits.plus(BigInt.fromI32(1));
-  vaultUser.tokensIn = updateTotalTokens(vaultUser.tokensIn, tokensIn);
-  vaultUser.tokensOut = updateTotalTokens(vaultUser.tokensOut, tokensOut);  // If you want to track net tokens in/out
-  vaultUser.sharesBalance = vaultUser.sharesBalance.plus(sharesMinted);  // You need to calculate sharesMinted
-  vaultUser.save();
+  // Update User
+  const userId = `${sender}-${vault}`;
+  let user = User.load(userId) || new User(userId);
+  user.block = block.header.hash.toHexString();
+  user.user = sender;
+  user.vault = vault;
+  user.deposits = user.deposits!.plus(BigInt.fromI32(1));
+  user.tokensIn = updateTotalTokens(user.tokensIn, tokensIn);
+  user.tokensOut = updateTotalTokens(user.tokensOut, tokensOut);  // If you want to track net tokens in/out
+  user.sharesBalance = user.sharesBalance!.plus(BigInt.fromString(sharesMinted));  // You need to calculate sharesMinted
+  user.save();
 
-  // Add to VaultUserHistory
+  // Add to UserHistory
   const historyId = `${userId}-${block.header.height.toString()}`;
-  let vaultUserHistory = new VaultUserHistory(historyId);
-  vaultUserHistory.user = vaultUser.id;
-  vaultUserHistory.block = block.header.hash.toHexString();
-  vaultUserHistory.vault = vault;
-  vaultUserHistory.tokensIn = tokensIn.map(token => saveCoinFromAttribute(historyId, token));
-  vaultUserHistory.tokensOut = tokensOut.map(token => saveCoinFromAttribute(historyId, token));
-  vaultUserHistory.deposits = vaultUser.deposits;
-  vaultUserHistory.redeems = vaultUser.redeems;  // Initialize or carry over
-  vaultUserHistory.claims = vaultUser.claims;  // Initialize or carry over
-  vaultUserHistory.sharesBalance = vaultUser.sharesBalance;
-  vaultUserHistory.save();
+  let userHistory = new UserHistory(historyId);
+  userHistory.user = user.id;
+  userHistory.block = block.header.hash.toHexString();
+  userHistory.user = sender;
+  userHistory.vault = vault;
+  userHistory.tokensIn = tokensIn.map(token => saveCoinFromAttribute(historyId, token));
+  userHistory.tokensOut = tokensOut.map(token => saveCoinFromAttribute(historyId, token));
+  userHistory.deposits = user.deposits;
+  userHistory.redeems = user.redeems;  // Initialize or carry over
+  userHistory.claims = user.claims;  // Initialize or carry over
+  userHistory.sharesBalance = user.sharesBalance;
+  userHistory.save();
 }
 
-export function handleVaultRedeem(id: string, block: cosmos.HeaderOnlyBlock, vault: string, tokensOut: string[], sharesBurned: string): void {
+export function handleVaultRedeem(id: string, block: cosmos.HeaderOnlyBlock, sender: string, vault: string, tokensOut: string[], sharesBurned: string): void {
   let redeem = VaultRedeem.load(id);
 
   if (!redeem) {
@@ -77,7 +79,7 @@ export function handleVaultRedeem(id: string, block: cosmos.HeaderOnlyBlock, vau
   }
   redeem.save();
 
-  // Hisotry
+  // History
   let redeemHistory = new VaultRedeemHistory(`${id}-${block.header.height}`);
   redeemHistory.redeem = redeem.id;
   redeemHistory.block = block.header.hash.toHexString();
@@ -86,41 +88,43 @@ export function handleVaultRedeem(id: string, block: cosmos.HeaderOnlyBlock, vau
   redeemHistory.count = redeem.count;
   redeemHistory.save();
 
-  // Update VaultUser
+  // Update User
   const userId = `${sender}-${vault}`;
-  let vaultUser = VaultUser.load(userId);
-  if (!vaultUser) {
-    vaultUser = new VaultUser(userId);
-    vaultUser.block = block.header.hash.toHexString();
-    vaultUser.vault = vault;
-    vaultUser.redeems = BigInt.fromI32(1);
-    vaultUser.tokensIn = []; // Initialize if needed
-    vaultUser.tokensOut = tokensOut.map(token => saveCoinFromAttribute(userId, token));
-    vaultUser.sharesBalance = BigInt.fromString(sharesBurned).neg();  // Initialize shares balance negatively if no prior data
+  let user = User.load(userId);
+  if (!user) {
+    user = new User(userId);
+    user.block = block.header.hash.toHexString();
+    user.user = sender;
+    user.vault = vault;
+    user.redeems = BigInt.fromI32(1);
+    user.tokensIn = []; // Initialize if needed
+    user.tokensOut = tokensOut.map(token => saveCoinFromAttribute(userId, token));
+    user.sharesBalance = BigInt.fromString(sharesBurned).neg();  // Initialize shares balance negatively if no prior data
   } else {
-    vaultUser.block = block.header.hash.toHexString();
-    vaultUser.redeems = vaultUser.redeems.plus(BigInt.fromI32(1));
-    vaultUser.tokensOut = updateTotalTokens(vaultUser.tokensOut, tokensOut);
-    vaultUser.sharesBalance = vaultUser.sharesBalance.minus(BigInt.fromString(sharesBurned));
+    user.block = block.header.hash.toHexString();
+    user.redeems = user.redeems!.plus(BigInt.fromI32(1));
+    user.tokensOut = updateTotalTokens(user.tokensOut, tokensOut);
+    user.sharesBalance = user.sharesBalance!.minus(BigInt.fromString(sharesBurned));
   }
-  vaultUser.save();
+  user.save();
 
-  // Add to VaultUserHistory
-  const historyId = `${id}-${sender}-${vault}`; // prepend with {blockHashHex}-{txIndex}-{...}
-  let vaultUserHistory = new VaultUserHistory(historyId);
-  vaultUserHistory.user = vaultUser.id;
-  vaultUserHistory.block = block.header.hash.toHexString();
-  vaultUserHistory.vault = vault;
-  vaultUserHistory.tokensIn = vaultUser.tokensIn;
-  vaultUserHistory.tokensOut = tokensOut.map(token => saveCoinFromAttribute(historyId, token));
-  vaultUserHistory.deposits = vaultUser.deposits; // Carry over existing values
-  vaultUserHistory.redeems = vaultUser.redeems;
-  vaultUserHistory.claims = vaultUser.claims; // Carry over existing values
-  vaultUserHistory.sharesBalance = vaultUser.sharesBalance;
-  vaultUserHistory.save();
+  // Add to UserHistory
+  const historyId = `${id}-${user}-${vault}`; // prepend with {blockHashHex}-{txIndex}-{...}
+  let userHistory = new UserHistory(historyId);
+  userHistory.user = user.id;
+  userHistory.block = block.header.hash.toHexString();
+  userHistory.user = sender;
+  userHistory.vault = vault;
+  userHistory.tokensIn = user.tokensIn;
+  userHistory.tokensOut = tokensOut.map(token => saveCoinFromAttribute(historyId, token));
+  userHistory.deposits = user.deposits; // Carry over existing values
+  userHistory.redeems = user.redeems;
+  userHistory.claims = user.claims; // Carry over existing values
+  userHistory.sharesBalance = user.sharesBalance;
+  userHistory.save();
 }
 
-export function handleVaultClaimRewards(id: string, block: cosmos.HeaderOnlyBlock, vault: string, tokensOut: string[]): void {
+export function handleVaultClaimRewards(id: string, block: cosmos.HeaderOnlyBlock, sender: string, vault: string, tokensOut: string[]): void {
   let claimReward = VaultClaimReward.load(id);
 
   if (!claimReward) {
@@ -145,35 +149,36 @@ export function handleVaultClaimRewards(id: string, block: cosmos.HeaderOnlyBloc
   claimRewardHistory.count = claimReward.count;
   claimRewardHistory.save();
 
-  // Update VaultUser
-  const userId = `${user}-${vault}`;
-  let vaultUser = VaultUser.load(userId);
-  if (!vaultUser) {
-    vaultUser = new VaultUser(userId);
-    vaultUser.block = block.header.hash.toHexString();
-    vaultUser.vault = vault;
-    vaultUser.claims = BigInt.fromI32(1);
-    vaultUser.tokensIn = []; // Initialize if needed
-    vaultUser.tokensOut = tokensOut.map(token => saveCoinFromAttribute(userId, token)); // Adjust if needed to reflect claims
-    vaultUser.sharesBalance = BigInt.fromI32(0); // Initialize if no prior data
+  // Update User
+  const userId = `${sender}-${vault}`;
+  let user = User.load(userId);
+  if (!user) {
+    user = new User(userId);
+    user.block = block.header.hash.toHexString();
+    user.user = sender;
+    user.vault = vault;
+    user.claims = BigInt.fromI32(1);
+    user.tokensIn = []; // Initialize if needed
+    user.tokensOut = tokensOut.map(token => saveCoinFromAttribute(userId, token)); // Adjust if needed to reflect claims
+    user.sharesBalance = BigInt.fromI32(0); // Initialize if no prior data
   } else {
-    vaultUser.block = block.header.hash.toHexString();
-    vaultUser.claims = vaultUser.claims.plus(BigInt.fromI32(1));
-    vaultUser.tokensOut = updateTotalTokens(vaultUser.tokensOut, tokensOut); // Reflect the rewards claimed
+    user.block = block.header.hash.toHexString();
+    user.claims = user.claims!.plus(BigInt.fromI32(1));
+    user.tokensOut = updateTotalTokens(user.tokensOut, tokensOut); // Reflect the rewards claimed
   }
-  vaultUser.save();
+  user.save();
 
-  // Add to VaultUserHistory
+  // Add to UserHistory
   const historyId = `${userId}-${block.header.height.toString()}`;
-  let vaultUserHistory = new VaultUserHistory(historyId);
-  vaultUserHistory.user = vaultUser.id;
-  vaultUserHistory.block = block.header.hash.toHexString();
-  vaultUserHistory.vault = vault;
-  vaultUserHistory.tokensIn = vaultUser.tokensIn; // Carry over
-  vaultUserHistory.tokensOut = vaultUser.tokensOut; // Include the claimed rewards
-  vaultUserHistory.deposits = vaultUser.deposits; // Carry over
-  vaultUserHistory.redeems = vaultUser.redeems; // Carry over
-  vaultUserHistory.claims = vaultUser.claims;
-  vaultUserHistory.sharesBalance = vaultUser.sharesBalance; // Carry over
-  vaultUserHistory.save();
+  let userHistory = new UserHistory(historyId);
+  userHistory.user = user.id;
+  userHistory.block = block.header.hash.toHexString();
+  userHistory.vault = vault;
+  userHistory.tokensIn = user.tokensIn; // Carry over
+  userHistory.tokensOut = user.tokensOut; // Include the claimed rewards
+  userHistory.deposits = user.deposits; // Carry over
+  userHistory.redeems = user.redeems; // Carry over
+  userHistory.claims = user.claims;
+  userHistory.sharesBalance = user.sharesBalance; // Carry over
+  userHistory.save();
 }
