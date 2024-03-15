@@ -4,9 +4,10 @@ type Block @entity {
     timestamp: BigInt!  # The timestamp when the block was mined
 }
 
-type VaultUser @entity {
-    id: ID!  # Composite key: {userId}-{vaultId}, uniquely identifying a user's interaction with a specific vault
+type User @entity {
+    id: ID!  # Composite key: {blockHashHex}-{txIndex}-{...}, uniquely identifying a user's interaction with a specific vault
     block: Block!  # The latest block where the user had an interaction with the vault
+    user: User!  # The associated User entity
     vault: String!  # The ID of the vault
     tokensIn: [Coin!]!  # The array of coins the user has deposited into the vault
     tokensOut: [Coin!]!  # The array of coins the user has redeemed from the vault
@@ -16,10 +17,10 @@ type VaultUser @entity {
     sharesBalance: BigInt  # The current balance of the user's shares in the vault
 }
 
-type VaultUserHistory @entity {
-    id: ID!  # Composite key: {userId}-{vaultId}-{blockHeight}, uniquely identifying an historical record for a user's interaction with a vault
-    user: VaultUser!  # The associated VaultUser entity
+type UserHistory @entity {
+    id: ID!  # Composite key: {blockHashHex}-{txIndex}-{...}, uniquely identifying an historical record for a user's interaction with a vault
     block: Block!  # The block where the historical interaction took place
+    user: User!  # The associated User entity
     vault: String!  # The ID of the vault
     tokensIn: [Coin!]!  # Historical record of coins the user had deposited up to this point
     tokensOut: [Coin!]!  # Historical record of coins the user had redeemed up to this point
@@ -30,28 +31,55 @@ type VaultUserHistory @entity {
 }
 
 type VaultDeposit @entity {
-    id: ID!  # Unique identifier for the deposit event {transactionHash}-{logIndex}
-    block: Block!  # The block in which the deposit occurred
-    vault: String!  # The ID of the vault where the deposit was made
-    tokensIn: [Coin!]!  # The coins that were deposited
-    tokensOut: [Coin!]!  # The coins that were refunded
-    count: BigInt  # The number of times deposits have been made into the vault (can aggregate multiple deposits in one transaction)
+    id: ID!  # Unique identifier for the deposit event, typically a combination of block hash and transaction index
+    block: Block!  # Reference to the block entity where the latest deposit transaction took place
+    vault: String!  # Identifier of the vault where the deposit occurred
+    tokensIn: [Coin!]!  # Array of Coin entities representing the tokens deposited
+    tokensOut: [Coin!]!  # Array of Coin entities representing any tokens refunded during the deposit process
+    count: BigInt  # Accumulative count of deposit transactions for this vault up to the current block
+}
+
+type VaultDepositHistory @entity {
+    id: ID!  # Unique identifier for the deposit history record, typically combining the deposit ID and the block height
+    block: Block!  # Reference to the block in which the deposit occurred
+    deposit: VaultDeposit!  # Reference to the associated VaultDeposit entity
+    vault: String!  # ID of the vault where the deposit took place
+    tokensIn: [Coin!]!  # Snapshot of the tokens that were deposited at this historical moment
+    count: BigInt  # The cumulative count of deposit transactions up to this point in time
 }
 
 type VaultRedeem @entity {
-    id: ID!  # Unique identifier for the redeem event {transactionHash}-{logIndex}
-    block: Block!  # The block in which the redeem occurred
-    vault: String!  # The ID of the vault from which the redeem was made
-    tokensOut: [Coin!]!  # The coins that were redeemed
-    count: BigInt  # The number of times redeems have been made from the vault (can aggregate multiple redeems in one transaction)
+    id: ID!  # Unique identifier for the redeem event, typically a combination of block hash and transaction index
+    block: Block!  # Reference to the block entity where the latest redeem transaction took place
+    vault: String!  # Identifier of the vault from which tokens were redeemed
+    tokensOut: [Coin!]!  # Array of Coin entities representing the tokens redeemed from the vault
+    count: BigInt  # Accumulative count of redeem transactions for this vault up to the current block
+}
+
+type VaultRedeemHistory @entity {
+    id: ID!  # Unique identifier for the redeem history record, typically combining the redeem ID and the block height
+    block: Block!  # Reference to the block in which the redeem occurred
+    vault: String!  # ID of the vault from which the redeem took place
+    redeem: VaultRedeem!  # Reference to the associated VaultRedeem entity
+    tokensOut: [Coin!]!  # Snapshot of the tokens that were redeemed at this historical moment
+    count: BigInt  # The cumulative count of redeem transactions up to this point in time
 }
 
 type VaultClaimReward @entity {
-    id: ID!  # Unique identifier for the claim reward event {transactionHash}-{logIndex}
-    block: Block!  # The block in which the claim reward occurred
-    vault: String!  # The ID of the vault from which the claim was made
-    tokensOut: [Coin!]!  # The reward coins that were claimed
-    count: BigInt  # The number of claim reward interactions that have occurred in the vault
+    id: ID!  # Unique identifier for the claim reward event, typically a combination of block hash and transaction index
+    block: Block!  # Reference to the block entity where the latest claim reward transaction took place
+    vault: String!  # Identifier of the vault from which rewards were claimed
+    tokensOut: [Coin!]!  # Array of Coin entities representing the reward tokens claimed
+    count: BigInt  # Accumulative count of claim reward transactions for this vault up to the current block
+}
+
+type VaultClaimRewardHistory @entity {
+    id: ID!  # Unique identifier for the claim reward history record, combining the claim ID and the block height
+    block: Block!  # Reference to the block in which the claim reward occurred
+    claimReward: VaultClaimReward!  # Reference to the associated VaultClaimReward entity
+    vault: String!  # ID of the vault from which the rewards were claimed
+    tokensOut: [Coin!]!  # Snapshot of the reward tokens that were claimed at this historical moment
+    count: BigInt  # The cumulative count of claim reward transactions up to this point in time
 }
 
 type Coin @entity {
